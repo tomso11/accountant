@@ -8,6 +8,12 @@ class PDFParser {
         this.rawText = '';
         this.parsedData = [];
         this.detectedColumns = [];
+        this.summary = {
+            beginningBalance: null,
+            endingBalance: null,
+            totalCredits: null,
+            totalDebits: null
+        };
     }
 
     /**
@@ -32,6 +38,9 @@ class PDFParser {
 
             this.rawText = fullText;
 
+            // Extract summary information first (before removing those lines)
+            this.extractSummary(fullText);
+
             // Detect table structure and extract data
             const tableData = this.detectAndExtractTables(fullText);
 
@@ -48,7 +57,8 @@ class PDFParser {
                 success: true,
                 data: this.parsedData,
                 columns: this.detectedColumns,
-                rowCount: this.parsedData.length
+                rowCount: this.parsedData.length,
+                summary: this.summary
             };
         } catch (error) {
             console.error('PDF parsing error:', error);
@@ -88,6 +98,76 @@ class PDFParser {
     }
 
     /**
+     * Extract summary information (balances, totals) from PDF text
+     */
+    extractSummary(text) {
+        const lines = text.split('\n');
+        const amountPattern = /[\$£€]?\s*-?\d{1,3}(,\d{3})*(\.\d{2})?/g;
+
+        for (const line of lines) {
+            const lower = line.toLowerCase();
+
+            // Extract beginning/opening balance
+            if ((lower.includes('beginning balance') || lower.includes('opening balance') ||
+                 lower.includes('previous balance') || lower.includes('balance forward')) &&
+                !this.summary.beginningBalance) {
+                const amounts = [...line.matchAll(amountPattern)];
+                if (amounts.length > 0) {
+                    this.summary.beginningBalance = this.parseAmount(amounts[amounts.length - 1][0]);
+                }
+            }
+
+            // Extract ending/closing balance
+            if ((lower.includes('ending balance') || lower.includes('closing balance') ||
+                 lower.includes('new balance') || lower.includes('current balance')) &&
+                !this.summary.endingBalance) {
+                const amounts = [...line.matchAll(amountPattern)];
+                if (amounts.length > 0) {
+                    this.summary.endingBalance = this.parseAmount(amounts[amounts.length - 1][0]);
+                }
+            }
+
+            // Extract total credits/deposits/payments
+            if ((lower.includes('total credits') || lower.includes('total deposits') ||
+                 lower.includes('total payments received') || lower.includes('deposits and credits')) &&
+                !this.summary.totalCredits) {
+                const amounts = [...line.matchAll(amountPattern)];
+                if (amounts.length > 0) {
+                    this.summary.totalCredits = this.parseAmount(amounts[amounts.length - 1][0]);
+                }
+            }
+
+            // Extract total debits/withdrawals/charges
+            if ((lower.includes('total debits') || lower.includes('total withdrawals') ||
+                 lower.includes('total charges') || lower.includes('checks and debits')) &&
+                !this.summary.totalDebits) {
+                const amounts = [...line.matchAll(amountPattern)];
+                if (amounts.length > 0) {
+                    this.summary.totalDebits = this.parseAmount(amounts[amounts.length - 1][0]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Parse amount string to number
+     */
+    parseAmount(amountStr) {
+        if (!amountStr) return null;
+
+        // Remove currency symbols, whitespace, and commas
+        let cleaned = amountStr.replace(/[\$£€,\s]/g, '');
+
+        // Handle negative amounts in parentheses
+        if (cleaned.includes('(') && cleaned.includes(')')) {
+            cleaned = '-' + cleaned.replace(/[()]/g, '');
+        }
+
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? null : num;
+    }
+
+    /**
      * Detect and extract table data from text
      */
     detectAndExtractTables(text) {
@@ -121,6 +201,9 @@ class PDFParser {
         if (headerLine >= 0 && detectedHeaders.length > 0) {
             // Parse rows based on detected headers
             for (let i = headerLine + 1; i < lines.length; i++) {
+                // Skip non-transaction lines
+                if (this.isHeaderOrFooter(lines[i])) continue;
+
                 const row = this.parseRow(lines[i], detectedHeaders.length);
                 if (row && row.length > 0) {
                     const rowObj = {};
@@ -218,6 +301,9 @@ class PDFParser {
         const amountPattern = /[\$£€]?\s*-?\d{1,3}(,\d{3})*(\.\d{2})?/g;
 
         for (const line of lines) {
+            // Skip non-transaction lines
+            if (this.isHeaderOrFooter(line)) continue;
+
             if (line.trim().length < 10) continue;
 
             const dateMatch = line.match(datePattern);
@@ -237,6 +323,9 @@ class PDFParser {
                 description = description.replace(amt, '');
             });
             description = description.trim();
+
+            // Skip if description is empty or too short
+            if (description.length < 3) continue;
 
             rows.push({
                 'Date': date,
@@ -268,17 +357,57 @@ class PDFParser {
     }
 
     /**
-     * Detect if line is likely a header or footer
+     * Detect if line is likely a header, footer, or summary (not a transaction)
      */
     isHeaderOrFooter(line) {
         const lower = line.toLowerCase();
+
+        // Comprehensive list of non-transaction indicators
         const skipPatterns = [
-            'page', 'total', 'subtotal', 'balance forward',
-            'continued', 'statement', 'account', 'customer',
-            'beginning balance', 'ending balance'
+            // Page indicators
+            'page', 'page of', 'of page',
+
+            // Summary lines
+            'total', 'subtotal', 'grand total',
+            'beginning balance', 'ending balance', 'opening balance', 'closing balance',
+            'balance forward', 'balance brought forward', 'balance carried forward',
+
+            // Credits/Debits totals
+            'total credits', 'total debits', 'total payments', 'total deposits',
+            'total withdrawals', 'total fees',
+
+            // Headers
+            'statement', 'account summary', 'transaction history',
+            'account number', 'account holder', 'customer',
+            'date', 'description', 'amount', 'balance',
+
+            // Footers
+            'continued', 'continued on next page',
+            'please retain', 'important notice', 'member fdic',
+
+            // Other common non-transaction text
+            'activity summary', 'year-to-date', 'ytd',
+            'interest charged', 'interest earned',
+            'minimum payment', 'payment due'
         ];
 
-        return skipPatterns.some(pattern => lower.includes(pattern));
+        // Check if line matches any skip pattern
+        if (skipPatterns.some(pattern => lower.includes(pattern))) {
+            return true;
+        }
+
+        // Skip lines that are too short (likely not transactions)
+        if (line.trim().length < 15) {
+            return true;
+        }
+
+        // Skip lines that look like standalone dates (headers)
+        const datePattern = /^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})|(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})$/;
+        if (datePattern.test(line.trim())) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

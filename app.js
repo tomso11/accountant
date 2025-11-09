@@ -8,6 +8,7 @@ class PDFToCSVApp {
         this.parser = new PDFParser();
         this.currentData = [];
         this.columnMapping = [];
+        this.summary = null;
         this.initializeEventListeners();
     }
 
@@ -71,6 +72,7 @@ class PDFToCSVApp {
             }
 
             this.currentData = result.data;
+            this.summary = result.summary;
 
             // Initialize column mapping from detected columns
             this.initializeColumnMapping(result.columns);
@@ -80,6 +82,7 @@ class PDFToCSVApp {
             await this.sleep(300);
 
             this.hideSection('processingSection');
+            this.renderSummary();
             this.renderPreview();
             this.showSection('previewSection');
 
@@ -132,6 +135,56 @@ class PDFToCSVApp {
                 include: true
             });
         });
+    }
+
+    renderSummary() {
+        if (!this.summary) return;
+
+        const summarySection = document.getElementById('summarySection');
+        const hasSummaryData = this.summary.beginningBalance !== null ||
+                               this.summary.endingBalance !== null ||
+                               this.summary.totalCredits !== null ||
+                               this.summary.totalDebits !== null;
+
+        if (!hasSummaryData) {
+            summarySection.classList.add('hidden');
+            return;
+        }
+
+        summarySection.classList.remove('hidden');
+
+        // Format and display summary values
+        document.getElementById('beginningBalance').textContent =
+            this.summary.beginningBalance !== null
+                ? this.formatCurrency(this.summary.beginningBalance)
+                : '-';
+
+        document.getElementById('totalCredits').textContent =
+            this.summary.totalCredits !== null
+                ? this.formatCurrency(this.summary.totalCredits)
+                : '-';
+
+        document.getElementById('totalDebits').textContent =
+            this.summary.totalDebits !== null
+                ? this.formatCurrency(this.summary.totalDebits)
+                : '-';
+
+        document.getElementById('endingBalance').textContent =
+            this.summary.endingBalance !== null
+                ? this.formatCurrency(this.summary.endingBalance)
+                : '-';
+    }
+
+    formatCurrency(amount) {
+        const absAmount = Math.abs(amount);
+        const formatted = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(absAmount);
+
+        return amount < 0 ? `(${formatted})` : formatted;
     }
 
     renderPreview() {
@@ -349,7 +402,9 @@ class PDFToCSVApp {
     reset() {
         this.currentData = [];
         this.columnMapping = [];
+        this.summary = null;
         document.getElementById('fileInput').value = '';
+        this.hideSection('summarySection');
         this.hideSection('previewSection');
         this.hideSection('processingSection');
         this.showSection('uploadSection');

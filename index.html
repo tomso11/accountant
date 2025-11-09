@@ -39,6 +39,28 @@
                 <p>Review the extracted data and configure your columns</p>
             </div>
 
+            <div id="summarySection" class="summary-section hidden">
+                <h3>Statement Summary</h3>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-label">Beginning Balance</div>
+                        <div class="summary-value" id="beginningBalance">-</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Total Credits</div>
+                        <div class="summary-value positive" id="totalCredits">-</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Total Debits</div>
+                        <div class="summary-value negative" id="totalDebits">-</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Ending Balance</div>
+                        <div class="summary-value" id="endingBalance">-</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="config-panel">
                 <h3>Column Mapping</h3>
                 <div id="columnConfig" class="column-config">

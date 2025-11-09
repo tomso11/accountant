@@ -162,7 +162,7 @@ h1 {
 
 .column-item {
     display: grid;
-    grid-template-columns: 200px 1fr auto;
+    grid-template-columns: 200px 1fr 150px 32px;
     gap: 1rem;
     align-items: center;
     padding: 1rem;
@@ -285,8 +285,15 @@ tbody tr:last-child td {
 .btn-danger {
     background: var(--danger-color);
     color: white;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.9rem;
+    padding: 0.4rem;
+    font-size: 1rem;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    line-height: 1;
 }
 
 .btn-danger:hover {
@@ -306,6 +313,57 @@ footer {
     border-top: 1px solid var(--border);
     text-align: center;
     color: var(--text-secondary);
+}
+
+/* Summary Section */
+.summary-section {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.summary-section h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.summary-item {
+    text-align: center;
+    padding: 1rem;
+    background: var(--background);
+    border-radius: 8px;
+}
+
+.summary-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.summary-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.summary-value.positive {
+    color: var(--success-color);
+}
+
+.summary-value.negative {
+    color: var(--danger-color);
 }
 
 /* Utility Classes */
