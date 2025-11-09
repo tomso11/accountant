@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to CSV Converter for Accountants</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 PDF to CSV Converter</h1>
+            <p class="subtitle">Convert bank statements to CSV with precision - All processing happens in your browser</p>
+        </header>
+
+        <div class="upload-section">
+            <div id="dropZone" class="drop-zone">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p class="drop-text">Drop PDF here or click to upload</p>
+                <p class="drop-subtext">Bank statements from Brex, Chase, or any financial institution</p>
+                <input type="file" id="fileInput" accept=".pdf" hidden>
+            </div>
+        </div>
+
+        <div id="processingSection" class="processing-section hidden">
+            <div class="processing-card">
+                <div class="spinner"></div>
+                <p id="processingText">Processing PDF...</p>
+            </div>
+        </div>
+
+        <div id="previewSection" class="preview-section hidden">
+            <div class="section-header">
+                <h2>Preview & Configure</h2>
+                <p>Review the extracted data and configure your columns</p>
+            </div>
+
+            <div class="config-panel">
+                <h3>Column Mapping</h3>
+                <div id="columnConfig" class="column-config">
+                    <!-- Dynamic column configuration will be inserted here -->
+                </div>
+                <button id="addColumnBtn" class="btn btn-secondary">+ Add Column</button>
+            </div>
+
+            <div class="preview-panel">
+                <h3>Data Preview</h3>
+                <div class="table-container">
+                    <table id="dataTable">
+                        <thead id="tableHead">
+                            <!-- Headers will be inserted here -->
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Data rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+                <p class="preview-info">Showing <span id="rowCount">0</span> rows</p>
+            </div>
+
+            <div class="action-buttons">
+                <button id="downloadBtn" class="btn btn-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download CSV
+                </button>
+                <button id="resetBtn" class="btn btn-secondary">Upload Another PDF</button>
+            </div>
+        </div>
+
+        <footer>
+            <p>🔒 Secure & Private - All processing happens locally in your browser. No data is sent to any server.</p>
+        </footer>
+    </div>
+
+    <!-- PDF.js library from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Set the workerSrc for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <script src="pdf-parser.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

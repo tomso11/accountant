@@ -1,0 +1,13 @@
+{
+  "name": "pdf-to-csv-accountant",
+  "version": "1.0.0",
+  "description": "Browser-based PDF to CSV converter for accountants - extract bank statements with high accuracy",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "serve": "python3 -m http.server 8000"
+  },
+  "keywords": ["pdf", "csv", "accounting", "bank-statements", "brex"],
+  "author": "",
+  "license": "MIT"
+}

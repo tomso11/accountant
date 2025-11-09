@@ -1,0 +1,338 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --background: #f8fafc;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: var(--background);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+}
+
+/* Upload Section */
+.upload-section {
+    margin-bottom: 2rem;
+}
+
+.drop-zone {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 4rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+}
+
+.drop-zone svg {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.drop-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.drop-subtext {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Processing Section */
+.processing-section {
+    margin: 3rem 0;
+}
+
+.processing-card {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 3rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    margin: 0 auto 1.5rem;
+    border: 4px solid var(--border);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+#processingText {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+}
+
+/* Preview Section */
+.preview-section {
+    margin-top: 3rem;
+}
+
+.section-header {
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.section-header p {
+    color: var(--text-secondary);
+}
+
+/* Config Panel */
+.config-panel {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.config-panel h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.column-config {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.column-item {
+    display: grid;
+    grid-template-columns: 200px 1fr auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem;
+    background: var(--background);
+    border-radius: 8px;
+}
+
+.column-item label {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.column-item input,
+.column-item select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.column-item input:focus,
+.column-item select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Preview Panel */
+.preview-panel {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.preview-panel h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.table-container {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+thead {
+    background: var(--background);
+}
+
+th {
+    text-align: left;
+    padding: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border);
+}
+
+td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+tbody tr:hover {
+    background: var(--background);
+}
+
+tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.preview-info {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+}
+
+.btn-secondary {
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: var(--background);
+}
+
+.btn-danger {
+    background: var(--danger-color);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+/* Footer */
+footer {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    .column-item {
+        grid-template-columns: 1fr;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
