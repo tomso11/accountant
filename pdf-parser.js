@@ -206,11 +206,16 @@ class PDFParser {
 
                 const row = this.parseRow(lines[i], detectedHeaders.length);
                 if (row && row.length > 0) {
+                    // Build row object
                     const rowObj = {};
                     detectedHeaders.forEach((header, idx) => {
                         rowObj[header] = row[idx] || '';
                     });
-                    rows.push(rowObj);
+
+                    // Validate the row has actual transaction data
+                    if (this.isValidRowObject(rowObj)) {
+                        rows.push(rowObj);
+                    }
                 }
             }
         } else {
@@ -324,8 +329,10 @@ class PDFParser {
             });
             description = description.trim();
 
-            // Skip if description is empty or too short
-            if (description.length < 3) continue;
+            // Additional validation for transactions
+            if (!this.isValidTransaction(date, description, amount)) {
+                continue;
+            }
 
             rows.push({
                 'Date': date,
@@ -335,6 +342,110 @@ class PDFParser {
         }
 
         return rows;
+    }
+
+    /**
+     * Validate if a parsed row object is likely a real transaction
+     */
+    isValidRowObject(rowObj) {
+        // Find date, description, and amount columns (case-insensitive)
+        const keys = Object.keys(rowObj).map(k => k.toLowerCase());
+
+        let dateValue = null;
+        let descValue = null;
+        let amountValue = null;
+
+        // Find date column
+        const dateKey = Object.keys(rowObj).find(k => {
+            const lower = k.toLowerCase();
+            return lower.includes('date') || lower.includes('time');
+        });
+        if (dateKey) dateValue = rowObj[dateKey];
+
+        // Find description column
+        const descKey = Object.keys(rowObj).find(k => {
+            const lower = k.toLowerCase();
+            return lower.includes('desc') || lower.includes('memo') ||
+                   lower.includes('detail') || lower.includes('transaction');
+        });
+        if (descKey) descValue = rowObj[descKey];
+
+        // Find amount column
+        const amountKey = Object.keys(rowObj).find(k => {
+            const lower = k.toLowerCase();
+            return lower.includes('amount') || lower.includes('debit') ||
+                   lower.includes('credit');
+        });
+        if (amountKey) amountValue = rowObj[amountKey];
+
+        // If we have all three, validate them
+        if (dateValue && descValue && amountValue) {
+            return this.isValidTransaction(dateValue, descValue, amountValue);
+        }
+
+        // Otherwise, check if any value looks like a reasonable transaction
+        const values = Object.values(rowObj).filter(v => v && v.toString().trim().length > 0);
+
+        // Must have at least 2 non-empty values
+        if (values.length < 2) return false;
+
+        // Check if values contain obvious non-transaction content
+        const combinedText = values.join(' ').toLowerCase();
+        const badPatterns = [
+            'overdraft', 'we offer', 'we pay', 'you may', 'please',
+            'network', 'government', 'fednow', 'para espanol'
+        ];
+
+        for (const pattern of badPatterns) {
+            if (combinedText.includes(pattern)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate if a parsed line is likely a real transaction
+     */
+    isValidTransaction(date, description, amount) {
+        // Description must be reasonably long
+        if (description.length < 3) return false;
+
+        // Description shouldn't be just numbers or special characters
+        const hasLetters = /[a-zA-Z]/.test(description);
+        if (!hasLetters) return false;
+
+        // Amount should look reasonable (not just "111" or "212" - likely account numbers)
+        const cleanAmount = amount.replace(/[\$£€,\s]/g, '');
+        const amountNum = parseFloat(cleanAmount);
+
+        // Most transactions have cents (.XX)
+        // If it's a whole number over 1000 with no decimals, it's suspicious
+        if (amountNum > 1000 && !amount.includes('.')) {
+            return false;
+        }
+
+        // Description shouldn't be just 2-3 random words
+        const words = description.split(/\s+/).filter(w => w.length > 1);
+        if (words.length < 2) return false;
+
+        // Description shouldn't contain obvious non-transaction patterns
+        const badDescPatterns = [
+            /^\d{5,}$/,  // Just a long number
+            /^[A-Z]{2,3}$/,  // Just 2-3 capital letters
+            /\bor\b.*\bgovernment\b/i,
+            /\bnetwork\b/i,
+            /\bcalls?\b/i
+        ];
+
+        for (const pattern of badDescPatterns) {
+            if (pattern.test(description)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -361,6 +472,7 @@ class PDFParser {
      */
     isHeaderOrFooter(line) {
         const lower = line.toLowerCase();
+        const trimmed = line.trim();
 
         // Comprehensive list of non-transaction indicators
         const skipPatterns = [
@@ -371,24 +483,48 @@ class PDFParser {
             'total', 'subtotal', 'grand total',
             'beginning balance', 'ending balance', 'opening balance', 'closing balance',
             'balance forward', 'balance brought forward', 'balance carried forward',
+            'deposits and additions', 'withdrawals and subtractions',
 
             // Credits/Debits totals
             'total credits', 'total debits', 'total payments', 'total deposits',
-            'total withdrawals', 'total fees',
+            'total withdrawals', 'total fees', 'electronic withdrawals',
 
             // Headers
-            'statement', 'account summary', 'transaction history',
-            'account number', 'account holder', 'customer',
-            'date', 'description', 'amount', 'balance',
+            'statement', 'account summary', 'transaction history', 'transaction detail',
+            'account number', 'account holder', 'customer', 'member',
+            'date', 'description', 'amount', 'balance', 'memo',
 
-            // Footers
-            'continued', 'continued on next page',
-            'please retain', 'important notice', 'member fdic',
+            // Legal/Disclaimers
+            'please note', 'please retain', 'important notice', 'member fdic',
+            'overdraft', 'standard overdraft practice', 'chase secure',
+            'we offer', 'we pay', 'we authorize', 'we wont', 'we can',
+            'what you need', 'what is', 'what if', 'what fees',
+            'this notice', 'agreement', 'deposit account', 'terms and conditions',
+            'for more information', 'call', 'contact', 'visit',
+
+            // Contact info
+            'international calls', 'para espanol', 'accept operator',
+            'phone:', 'email:', 'www.', 'http', '.com',
+
+            // Addresses and locations
+            'brooklyn', 'ny ', 'ca ', 'tx ', ' street', ' st ', ' ave ', ' blvd',
+
+            // Instructions
+            'you may', 'you can', 'you need', 'you must', 'to enroll',
+            'if you', 'an overdraft', 'whether', 'presented for payment',
+            'your transaction', 'your account', 'your chase',
+
+            // Network/Payment systems
+            'fednow', 'network', 'providers', 'government',
+
+            // Fee related (non-transaction)
+            'fees per', 'business days', 'transfer',
 
             // Other common non-transaction text
             'activity summary', 'year-to-date', 'ytd',
             'interest charged', 'interest earned',
-            'minimum payment', 'payment due'
+            'minimum payment', 'payment due',
+            'recurring', 'checks and other', 'sapphire'
         ];
 
         // Check if line matches any skip pattern
@@ -397,13 +533,34 @@ class PDFParser {
         }
 
         // Skip lines that are too short (likely not transactions)
-        if (line.trim().length < 15) {
+        if (trimmed.length < 15) {
+            return true;
+        }
+
+        // Skip lines with too many consecutive capital letters (likely headers/legal)
+        const capsSequence = trimmed.match(/[A-Z]{4,}/);
+        if (capsSequence) {
+            return true;
+        }
+
+        // Skip lines that are mostly just a few words with lots of spaces/tabs
+        const wordCount = trimmed.split(/\s+/).filter(w => w.length > 0).length;
+        if (wordCount < 3) {
             return true;
         }
 
         // Skip lines that look like standalone dates (headers)
         const datePattern = /^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})|(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})$/;
-        if (datePattern.test(line.trim())) {
+        if (datePattern.test(trimmed)) {
+            return true;
+        }
+
+        // Skip lines with common non-transaction words at the start
+        const startsWithNonTransaction = [
+            'we ', 'you ', 'for ', 'if ', 'an ', 'the ', 'this ',
+            'please ', 'what ', 'whether ', 'with ', 'by ', 'at '
+        ];
+        if (startsWithNonTransaction.some(start => lower.startsWith(start))) {
             return true;
         }
 
