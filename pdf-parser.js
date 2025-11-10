@@ -129,7 +129,8 @@ class PDFParser {
 
             // Extract total credits/deposits/payments
             if ((lower.includes('total credits') || lower.includes('total deposits') ||
-                 lower.includes('total payments received') || lower.includes('deposits and credits')) &&
+                 lower.includes('total payments received') || lower.includes('deposits and credits') ||
+                 lower.includes('deposits and additions')) &&
                 !this.summary.totalCredits) {
                 const amounts = [...line.matchAll(amountPattern)];
                 if (amounts.length > 0) {
@@ -139,7 +140,8 @@ class PDFParser {
 
             // Extract total debits/withdrawals/charges
             if ((lower.includes('total debits') || lower.includes('total withdrawals') ||
-                 lower.includes('total charges') || lower.includes('checks and debits')) &&
+                 lower.includes('total charges') || lower.includes('checks and debits') ||
+                 lower.includes('electronic withdrawals') || lower.includes('withdrawals and subtractions')) &&
                 !this.summary.totalDebits) {
                 const amounts = [...line.matchAll(amountPattern)];
                 if (amounts.length > 0) {
@@ -259,25 +261,29 @@ class PDFParser {
         let parts = line.split(/\s{2,}|\t/).filter(p => p.trim().length > 0);
 
         if (parts.length > 1) {
-            // Clean up and deduplicate headers
+            // Clean up headers
             parts = parts.map(h => h.trim());
 
-            // If we have duplicate "Amount" columns, rename the last one to "Balance"
-            const amountIndices = [];
-            parts.forEach((part, idx) => {
-                if (part.toLowerCase().includes('amount')) {
-                    amountIndices.push(idx);
+            // Handle duplicate column names
+            const seen = new Map();
+            parts = parts.map((part, idx) => {
+                const lower = part.toLowerCase();
+
+                // Check if this is a duplicate
+                if (seen.has(lower)) {
+                    // If it's a duplicate "amount", rename to "Balance"
+                    if (lower.includes('amount') || lower === 'amount') {
+                        return 'Balance';
+                    }
+                    // Otherwise, add a number suffix
+                    const count = seen.get(lower);
+                    seen.set(lower, count + 1);
+                    return `${part} ${count + 1}`;
+                } else {
+                    seen.set(lower, 1);
+                    return part;
                 }
             });
-
-            // If there are multiple amount columns and a balance column doesn't exist
-            if (amountIndices.length > 1) {
-                const hasBalance = parts.some(p => p.toLowerCase().includes('balance'));
-                if (!hasBalance) {
-                    // Rename the last "Amount" to "Balance"
-                    parts[amountIndices[amountIndices.length - 1]] = 'Balance';
-                }
-            }
 
             return parts;
         }
@@ -337,15 +343,17 @@ class PDFParser {
                 // Build result array based on expected columns
                 const result = [date];
 
-                // Extract description (everything before the last amount)
-                const lastAmountIndex = remaining.lastIndexOf(amountMatches[amountMatches.length - 1][0]);
-                const description = remaining.substring(0, lastAmountIndex).trim();
+                // Extract description (everything before the FIRST amount, not the last)
+                const firstAmountIndex = remaining.indexOf(amountMatches[0][0]);
+                const description = remaining.substring(0, firstAmountIndex).trim();
 
                 if (description.length > 0) {
                     result.push(description);
                 }
 
-                // Add amounts
+                // Add amounts in order
+                // If there's only one amount, it's the transaction amount
+                // If there are two amounts, first is transaction amount, second is balance
                 amountMatches.forEach(match => {
                     result.push(match[0].trim());
                 });
