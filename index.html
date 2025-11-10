@@ -41,7 +41,7 @@
 
             <div id="summarySection" class="summary-section hidden">
                 <h3>Statement Summary</h3>
-                <div class="summary-grid">
+                <div id="summaryContent" class="summary-grid">
                     <div class="summary-item">
                         <div class="summary-label">Beginning Balance</div>
                         <div class="summary-value" id="beginningBalance">-</div>
@@ -58,6 +58,15 @@
                         <div class="summary-label">Ending Balance</div>
                         <div class="summary-value" id="endingBalance">-</div>
                     </div>
+                </div>
+                <div id="summaryEmptyState" class="summary-empty-state hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <p class="empty-state-text">Balance information could not be detected in this PDF</p>
+                    <p class="empty-state-subtext">The statement summary (beginning balance, ending balance, credits, and debits) was not found. You can still export the transaction data below.</p>
                 </div>
             </div>
 

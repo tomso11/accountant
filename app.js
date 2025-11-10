@@ -141,17 +141,27 @@ class PDFToCSVApp {
         if (!this.summary) return;
 
         const summarySection = document.getElementById('summarySection');
+        const summaryContent = document.getElementById('summaryContent');
+        const summaryEmptyState = document.getElementById('summaryEmptyState');
+
         const hasSummaryData = this.summary.beginningBalance !== null ||
                                this.summary.endingBalance !== null ||
                                this.summary.totalCredits !== null ||
                                this.summary.totalDebits !== null;
 
+        // Always show the summary section
+        summarySection.classList.remove('hidden');
+
         if (!hasSummaryData) {
-            summarySection.classList.add('hidden');
+            // Show empty state, hide data grid
+            summaryContent.classList.add('hidden');
+            summaryEmptyState.classList.remove('hidden');
             return;
         }
 
-        summarySection.classList.remove('hidden');
+        // Show data grid, hide empty state
+        summaryContent.classList.remove('hidden');
+        summaryEmptyState.classList.add('hidden');
 
         // Format and display summary values
         document.getElementById('beginningBalance').textContent =
@@ -404,7 +414,12 @@ class PDFToCSVApp {
         this.columnMapping = [];
         this.summary = null;
         document.getElementById('fileInput').value = '';
+
+        // Reset summary section visibility
         this.hideSection('summarySection');
+        document.getElementById('summaryContent').classList.remove('hidden');
+        document.getElementById('summaryEmptyState').classList.add('hidden');
+
         this.hideSection('previewSection');
         this.hideSection('processingSection');
         this.showSection('uploadSection');

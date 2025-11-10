@@ -366,6 +366,32 @@ footer {
     color: var(--danger-color);
 }
 
+.summary-empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+}
+
+.summary-empty-state svg {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-subtext {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
 /* Utility Classes */
 .hidden {
     display: none !important;
