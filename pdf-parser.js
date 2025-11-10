@@ -340,16 +340,12 @@ class PDFParser {
             const amountMatches = [...remaining.matchAll(new RegExp(amountPattern, 'g'))];
 
             if (amountMatches.length > 0) {
-                // Build result array based on expected columns
-                const result = [date];
-
-                // Extract description (everything before the FIRST amount, not the last)
+                // Extract description (everything before the FIRST amount)
                 const firstAmountIndex = remaining.indexOf(amountMatches[0][0]);
                 const description = remaining.substring(0, firstAmountIndex).trim();
 
-                if (description.length > 0) {
-                    result.push(description);
-                }
+                // Build result array - ALWAYS include description (even if empty) to maintain column alignment
+                const result = [date, description || ''];
 
                 // Add amounts in order
                 // If there's only one amount, it's the transaction amount
@@ -389,15 +385,13 @@ class PDFParser {
 
             const date = dateMatch[0].trim();
             const amounts = amountMatches.map(m => m[0].trim());
-            const amount = amounts[amounts.length - 1];
+            // Use the FIRST amount as the transaction amount (last amount is usually the balance)
+            const amount = amounts[0];
 
-            // Extract description (everything except date and amounts)
+            // Extract description (everything between date and first amount)
             let description = line;
-            description = description.replace(date, '');
-            amounts.forEach(amt => {
-                description = description.replace(amt, '');
-            });
-            description = description.trim();
+            const firstAmountIndex = line.indexOf(amounts[0]);
+            description = line.substring(date.length, firstAmountIndex).trim();
 
             // Additional validation for transactions
             if (!this.isValidTransaction(date, description, amount)) {
