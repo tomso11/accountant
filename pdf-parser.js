@@ -256,10 +256,30 @@ class PDFParser {
      */
     extractHeaders(line) {
         // Split by multiple spaces or tabs
-        const parts = line.split(/\s{2,}|\t/).filter(p => p.trim().length > 0);
+        let parts = line.split(/\s{2,}|\t/).filter(p => p.trim().length > 0);
 
         if (parts.length > 1) {
-            return parts.map(h => h.trim());
+            // Clean up and deduplicate headers
+            parts = parts.map(h => h.trim());
+
+            // If we have duplicate "Amount" columns, rename the last one to "Balance"
+            const amountIndices = [];
+            parts.forEach((part, idx) => {
+                if (part.toLowerCase().includes('amount')) {
+                    amountIndices.push(idx);
+                }
+            });
+
+            // If there are multiple amount columns and a balance column doesn't exist
+            if (amountIndices.length > 1) {
+                const hasBalance = parts.some(p => p.toLowerCase().includes('balance'));
+                if (!hasBalance) {
+                    // Rename the last "Amount" to "Balance"
+                    parts[amountIndices[amountIndices.length - 1]] = 'Balance';
+                }
+            }
+
+            return parts;
         }
 
         // Fallback: common patterns
@@ -420,9 +440,21 @@ class PDFParser {
         });
         if (amountKey) amountValue = rowObj[amountKey];
 
-        // If we have all three, validate them
-        if (dateValue && descValue && amountValue) {
-            return this.isValidTransaction(dateValue, descValue, amountValue);
+        // Check if the "date" field contains summary text instead of a date
+        if (dateValue) {
+            const dateLower = dateValue.toLowerCase().trim();
+            const summaryKeywords = ['beginning', 'ending', 'opening', 'closing', 'total', 'subtotal'];
+            if (summaryKeywords.some(keyword => dateLower === keyword || dateLower.startsWith(keyword + ' '))) {
+                return false;
+            }
+        }
+
+        // Check if description field contains balance-related text
+        if (descValue) {
+            const descLower = descValue.toLowerCase().trim();
+            if (descLower === 'balance' || descLower === 'withdrawals' || descLower === 'deposits') {
+                return false;
+            }
         }
 
         // Otherwise, check if any value looks like a reasonable transaction
@@ -434,14 +466,21 @@ class PDFParser {
         // Check if values contain obvious non-transaction content
         const combinedText = values.join(' ').toLowerCase();
         const badPatterns = [
+            'beginning balance', 'ending balance', 'opening balance', 'closing balance',
             'overdraft', 'we offer', 'we pay', 'you may', 'please',
-            'network', 'government', 'fednow', 'para espanol'
+            'network', 'government', 'fednow', 'para espanol',
+            'electronic withdrawals', 'deposits and additions'
         ];
 
         for (const pattern of badPatterns) {
             if (combinedText.includes(pattern)) {
                 return false;
             }
+        }
+
+        // If we have all three, validate them
+        if (dateValue && descValue && amountValue) {
+            return this.isValidTransaction(dateValue, descValue, amountValue);
         }
 
         return true;
@@ -451,6 +490,23 @@ class PDFParser {
      * Validate if a parsed line is likely a real transaction
      */
     isValidTransaction(date, description, amount) {
+        // Date must look like an actual date (not "Beginning", "Ending", etc.)
+        if (date) {
+            const dateLower = date.toLowerCase().trim();
+            const datePattern = /^(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/;
+
+            // Check if it's actually a date format
+            if (!datePattern.test(date)) {
+                return false;
+            }
+
+            // Extra check: reject summary keywords in date field
+            const summaryKeywords = ['beginning', 'ending', 'opening', 'closing', 'total'];
+            if (summaryKeywords.some(keyword => dateLower.includes(keyword))) {
+                return false;
+            }
+        }
+
         // Description must have some content
         if (!description || description.length < 2) return false;
 
@@ -458,17 +514,25 @@ class PDFParser {
         const hasLetters = /[a-zA-Z]/.test(description);
         if (!hasLetters) return false;
 
-        // Amount should look reasonable (not just "111" or "212" - likely account numbers)
-        const cleanAmount = amount.replace(/[\$£€,\s-]/g, '');
-        const amountNum = parseFloat(cleanAmount);
-
-        // Reject invalid amounts
-        if (isNaN(amountNum) || amountNum === 0) return false;
-
-        // Most transactions have cents (.XX)
-        // If it's a whole number over 5000 with no decimals, it's suspicious (might be account number)
-        if (amountNum > 5000 && !amount.includes('.')) {
+        // Filter out summary descriptions
+        const descLower = description.toLowerCase().trim();
+        if (descLower === 'balance' || descLower === 'withdrawals' || descLower === 'deposits') {
             return false;
+        }
+
+        // Amount validation (if provided)
+        if (amount) {
+            const cleanAmount = amount.replace(/[\$£€,\s-]/g, '');
+            const amountNum = parseFloat(cleanAmount);
+
+            // Reject invalid amounts
+            if (isNaN(amountNum) || amountNum === 0) return false;
+
+            // Most transactions have cents (.XX)
+            // If it's a whole number over 5000 with no decimals, it's suspicious (might be account number)
+            if (amountNum > 5000 && !amount.includes('.')) {
+                return false;
+            }
         }
 
         // Description shouldn't contain obvious non-transaction patterns
