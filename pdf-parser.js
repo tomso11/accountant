@@ -184,9 +184,13 @@ class PDFParser {
         let headerLine = -1;
         let detectedHeaders = [];
 
-        // Try to find header line
-        for (let i = 0; i < Math.min(20, lines.length); i++) {
+        // Try to find header line - DON'T skip potential headers during this search
+        for (let i = 0; i < Math.min(30, lines.length); i++) {
             const line = lines[i].toLowerCase();
+
+            // Skip obvious non-header lines, but be permissive
+            if (this.isDefinitelyNotHeader(line)) continue;
+
             const matchCount = commonHeaders.filter(h => line.includes(h)).length;
 
             if (matchCount >= 2) {
@@ -231,6 +235,23 @@ class PDFParser {
     }
 
     /**
+     * Check if a line is definitely not a table header (for header detection only)
+     */
+    isDefinitelyNotHeader(line) {
+        const lower = line.toLowerCase();
+
+        // Only skip obvious non-headers during header search
+        const definiteNonHeaders = [
+            'we offer', 'we pay', 'we authorize', 'you may', 'you can',
+            'if you', 'please note', 'for more information',
+            'member fdic', 'para espanol', 'international calls',
+            'brooklyn', 'columbus', 'chase bank'
+        ];
+
+        return definiteNonHeaders.some(pattern => lower.includes(pattern));
+    }
+
+    /**
      * Extract headers from header line
      */
     extractHeaders(line) {
@@ -265,33 +286,54 @@ class PDFParser {
     parseRow(line, expectedColumns) {
         // Try multiple splitting strategies
 
-        // Strategy 1: Multiple spaces or tabs
-        let parts = line.split(/\s{2,}|\t/).filter(p => p.trim().length > 0);
+        // Strategy 1: Tabs (most reliable)
+        let parts = line.split('\t').filter(p => p.trim().length > 0);
 
-        if (parts.length >= expectedColumns - 1) {
-            return parts;
+        if (parts.length >= expectedColumns - 1 && parts.length <= expectedColumns + 1) {
+            return parts.map(p => p.trim());
         }
 
-        // Strategy 2: Detect date, amount patterns
-        const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})|(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/;
-        const amountPattern = /[\$£€]?\s*-?\d{1,3}(,\d{3})*(\.\d{2})?/;
+        // Strategy 2: Multiple spaces (2 or more)
+        parts = line.split(/\s{2,}/).filter(p => p.trim().length > 0);
+
+        if (parts.length >= expectedColumns - 1 && parts.length <= expectedColumns + 1) {
+            return parts.map(p => p.trim());
+        }
+
+        // Strategy 3: Pattern-based extraction (date + description + amounts)
+        const datePattern = /^(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/;
+        const amountPattern = /-?\$?[\d,]+\.\d{2}|-?\d{1,3}(?:,\d{3})+\.\d{2}/g;
 
         const dateMatch = line.match(datePattern);
-        const amountMatches = [...line.matchAll(new RegExp(amountPattern, 'g'))];
 
-        if (dateMatch && amountMatches.length > 0) {
-            const date = dateMatch[0];
-            const amount = amountMatches[amountMatches.length - 1][0];
+        if (dateMatch) {
+            const date = dateMatch[0].trim();
+            let remaining = line.substring(date.length).trim();
 
-            let description = line
-                .replace(date, '|||')
-                .replace(amount, '|||')
-                .split('|||')
-                .filter(p => p.trim().length > 0)
-                .join(' ')
-                .trim();
+            // Find all amounts in the remaining text
+            const amountMatches = [...remaining.matchAll(new RegExp(amountPattern, 'g'))];
 
-            return [date, description, amount];
+            if (amountMatches.length > 0) {
+                // Build result array based on expected columns
+                const result = [date];
+
+                // Extract description (everything before the last amount)
+                const lastAmountIndex = remaining.lastIndexOf(amountMatches[amountMatches.length - 1][0]);
+                const description = remaining.substring(0, lastAmountIndex).trim();
+
+                if (description.length > 0) {
+                    result.push(description);
+                }
+
+                // Add amounts
+                amountMatches.forEach(match => {
+                    result.push(match[0].trim());
+                });
+
+                if (result.length >= 3) {
+                    return result;
+                }
+            }
         }
 
         return null;
@@ -409,34 +451,33 @@ class PDFParser {
      * Validate if a parsed line is likely a real transaction
      */
     isValidTransaction(date, description, amount) {
-        // Description must be reasonably long
-        if (description.length < 3) return false;
+        // Description must have some content
+        if (!description || description.length < 2) return false;
 
         // Description shouldn't be just numbers or special characters
         const hasLetters = /[a-zA-Z]/.test(description);
         if (!hasLetters) return false;
 
         // Amount should look reasonable (not just "111" or "212" - likely account numbers)
-        const cleanAmount = amount.replace(/[\$£€,\s]/g, '');
+        const cleanAmount = amount.replace(/[\$£€,\s-]/g, '');
         const amountNum = parseFloat(cleanAmount);
 
+        // Reject invalid amounts
+        if (isNaN(amountNum) || amountNum === 0) return false;
+
         // Most transactions have cents (.XX)
-        // If it's a whole number over 1000 with no decimals, it's suspicious
-        if (amountNum > 1000 && !amount.includes('.')) {
+        // If it's a whole number over 5000 with no decimals, it's suspicious (might be account number)
+        if (amountNum > 5000 && !amount.includes('.')) {
             return false;
         }
-
-        // Description shouldn't be just 2-3 random words
-        const words = description.split(/\s+/).filter(w => w.length > 1);
-        if (words.length < 2) return false;
 
         // Description shouldn't contain obvious non-transaction patterns
         const badDescPatterns = [
             /^\d{5,}$/,  // Just a long number
-            /^[A-Z]{2,3}$/,  // Just 2-3 capital letters
+            /^[A-Z]{1,2}$/,  // Just 1-2 capital letters
             /\bor\b.*\bgovernment\b/i,
-            /\bnetwork\b/i,
-            /\bcalls?\b/i
+            /fees per business day/i,
+            /during the time/i
         ];
 
         for (const pattern of badDescPatterns) {
@@ -477,22 +518,20 @@ class PDFParser {
         // Comprehensive list of non-transaction indicators
         const skipPatterns = [
             // Page indicators
-            'page', 'page of', 'of page',
+            'page of',
 
-            // Summary lines
-            'total', 'subtotal', 'grand total',
+            // Summary lines (be specific to avoid false positives)
             'beginning balance', 'ending balance', 'opening balance', 'closing balance',
             'balance forward', 'balance brought forward', 'balance carried forward',
             'deposits and additions', 'withdrawals and subtractions',
 
-            // Credits/Debits totals
+            // Credits/Debits totals (very specific)
             'total credits', 'total debits', 'total payments', 'total deposits',
             'total withdrawals', 'total fees', 'electronic withdrawals',
 
-            // Headers
-            'statement', 'account summary', 'transaction history', 'transaction detail',
-            'account number', 'account holder', 'customer', 'member',
-            'date', 'description', 'amount', 'balance', 'memo',
+            // Headers (only when they appear as standalone header rows)
+            'account summary', 'transaction history', 'transaction detail',
+            'account number', 'account holder',
 
             // Legal/Disclaimers
             'please note', 'please retain', 'important notice', 'member fdic',
@@ -500,31 +539,31 @@ class PDFParser {
             'we offer', 'we pay', 'we authorize', 'we wont', 'we can',
             'what you need', 'what is', 'what if', 'what fees',
             'this notice', 'agreement', 'deposit account', 'terms and conditions',
-            'for more information', 'call', 'contact', 'visit',
+            'for more information',
 
             // Contact info
             'international calls', 'para espanol', 'accept operator',
-            'phone:', 'email:', 'www.', 'http', '.com',
+            'www.', 'http',
 
-            // Addresses and locations
-            'brooklyn', 'ny ', 'ca ', 'tx ', ' street', ' st ', ' ave ', ' blvd',
+            // Bank names and addresses
+            'jpmorgan chase', 'chase bank', 'columbus, oh', 'brooklyn, ny',
 
-            // Instructions
+            // Instructions (specific phrases)
             'you may', 'you can', 'you need', 'you must', 'to enroll',
-            'if you', 'an overdraft', 'whether', 'presented for payment',
-            'your transaction', 'your account', 'your chase',
+            'an overdraft', 'whether', 'presented for payment',
+            'appeared. be prepared',
 
             // Network/Payment systems
-            'fednow', 'network', 'providers', 'government',
+            'fednow', 'providers',
 
             // Fee related (non-transaction)
-            'fees per', 'business days', 'transfer',
+            'fees per business day', 'business days during',
 
             // Other common non-transaction text
-            'activity summary', 'year-to-date', 'ytd',
+            'activity summary', 'year-to-date',
             'interest charged', 'interest earned',
             'minimum payment', 'payment due',
-            'recurring', 'checks and other', 'sapphire'
+            'checks and other', 'everyday debit card'
         ];
 
         // Check if line matches any skip pattern
@@ -533,19 +572,13 @@ class PDFParser {
         }
 
         // Skip lines that are too short (likely not transactions)
-        if (trimmed.length < 15) {
+        if (trimmed.length < 10) {
             return true;
         }
 
         // Skip lines with too many consecutive capital letters (likely headers/legal)
-        const capsSequence = trimmed.match(/[A-Z]{4,}/);
+        const capsSequence = trimmed.match(/[A-Z]{10,}/);
         if (capsSequence) {
-            return true;
-        }
-
-        // Skip lines that are mostly just a few words with lots of spaces/tabs
-        const wordCount = trimmed.split(/\s+/).filter(w => w.length > 0).length;
-        if (wordCount < 3) {
             return true;
         }
 
@@ -555,10 +588,21 @@ class PDFParser {
             return true;
         }
 
-        // Skip lines with common non-transaction words at the start
+        // Skip lines with obvious statement period
+        if (lower.includes('through') && lower.match(/\d{4}/)) {
+            return true;
+        }
+
+        // Skip lines that start with * (markers)
+        if (trimmed.startsWith('*')) {
+            return true;
+        }
+
+        // Skip lines with common non-transaction words at the start (only very specific ones)
         const startsWithNonTransaction = [
-            'we ', 'you ', 'for ', 'if ', 'an ', 'the ', 'this ',
-            'please ', 'what ', 'whether ', 'with ', 'by ', 'at '
+            'we offer', 'we pay', 'we authorize', 'we also',
+            'please ', 'what ', 'whether ',
+            'if you', 'during the time', 'appeared'
         ];
         if (startsWithNonTransaction.some(start => lower.startsWith(start))) {
             return true;
