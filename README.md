@@ -1,5 +1,8 @@
 # PDF to CSV Converter for Accountants
 
+> [!WARNING]
+> **Deprecated:** This project is no longer maintained. This repository is retained for archival and reference purposes.
+
 A browser-based tool that converts PDF bank statements (Brex, Chase, etc.) to CSV with high accuracy. All processing happens locally in your browser - no data is sent to any server, ensuring complete privacy and security.
 
 ## Features
